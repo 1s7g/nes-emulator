@@ -1,60 +1,56 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "cpu.h"
 
 // NES Emulator
-// started this project because i thought it would be "fun"
-// we'll see about that lmao
-
-// TODO: literally everything
+// day 2 (or whatever) - more opcodes, testing branches
 
 int main(int argc, char *argv[]) {
     printf("=== NES Emulator ===\n");
-    printf("version 0.0.0.0.0.1 (aka nothing works yet)\n\n");
+    printf("version 0.0.2 (more opcodes, still no rom loading)\n\n");
     
-    if (argc < 2) {
-        printf("Usage: nes <rom_file>\n");
-        printf("...but like, nothing works yet so dont bother\n");
-        return 1;
+    CPU cpu;
+    cpu_init(&cpu);
+    
+    // test program: count from 0 to 5 using a loop
+    // this tests LDA, CMP, BNE, INX and a few others
+    //
+    // basically:
+    //   LDX #$00     ; x = 0
+    //   LDA #$05     ; a = 5
+    //   STA $10      ; store 5 at addr $10 (our "target")
+    //   loop:
+    //     INX          ; x++
+    //     CPX $10      ; compare x with target
+    //     BNE loop     ; if not equal, keep going
+    //   NOP            ; done!
+
+    u8 test_program[] = {
+        0xA2, 0x00,  // LDX #$00
+        0xA9, 0x05,  // LDA #$05
+        0x85, 0x10,  // STA $10
+        // loop starts at offset 6 (0x8006)
+        0xE8,        // INX
+        0xE4, 0x10,  // CPX $10
+        0xD0, 0xFB,  // BNE -5 (back to INX)
+        0xEA,        // NOP - we made it!
+    };
+    
+    cpu_load_program(&cpu, test_program, sizeof(test_program), 0x8000);
+    cpu_load_program(&cpu, (u8[]){0x00, 0x80}, 2, 0xFFFC);
+    
+    cpu_reset(&cpu);
+    
+    printf("--- running loop test ---\n");
+    // run enough steps for the loop to complete
+    for (int i = 0; i < 25; i++) {
+        cpu_print_state(&cpu);
+        cpu_step(&cpu);
     }
-
-    char *rom_path = argv[1];
-    printf("ROM file: %s\n", rom_path);
-    printf("cool, now i just need to figure out how to actually load this thing\n");
-
-    // ok so the plan is:
-    // 1. load the rom
-    // 2. emulate the cpu (6502)
-    // 3. emulate the ppu (graphics)
-    // 4. emulate the apu (sound)
-    // 5. somehow make it all work together
-    // 6. ???
-    // 7. profit
+    printf("--- done ---\n\n");
     
-    // lets try to at least open the file i guess
-    FILE *f = fopen(rom_path, "rb");
-    if (f == NULL) {
-        printf("ERROR: couldnt open file '%s'\n", rom_path);
-        printf("did you spell it right?? lol\n");
-        return 1;
-    }
-
-    // just read the first few bytes to see if its a real NES rom
-    // NES roms start with "NES" followed by 0x1A (the iNES header)
-    unsigned char header[4];
-    fread(header, 1, 4, f);
-    
-    if (header[0] == 'N' && header[1] == 'E' && header[2] == 'S' && header[3] == 0x1A) {
-        printf("yoooo it's a valid NES rom!!\n");
-    } else {
-        printf("thats not a NES rom bro. header bytes: %02X %02X %02X %02X\n", 
-               header[0], header[1], header[2], header[3]);
-        fclose(f);
-        return 1;
-    }
-
-    fclose(f);
-    
-    printf("\nok thats all i can do for now. more coming soon (tm)\n");
+    printf("X register should be 0x05: got 0x%02X %s\n", 
+           cpu.x, cpu.x == 0x05 ? "(PASS)" : "(FAIL!!)");
     
     return 0;
 }

@@ -523,6 +523,447 @@ void cpu_step(CPU *cpu) {
             cpu_set_flag(cpu, FLAG_U, true);
             cpu->cycles += 4;
             break;
+        
+        // ===== ADC - Add with Carry =====
+        // this instruction is pain. overflow flag logic makes my brain hurt
+        case 0x69: { // ADC immediate
+            u16 addr = addr_immediate(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u16 result = cpu->a + val + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            
+            // overflow: set if sign of result differs from sign of both inputs
+            // i had to read like 4 different explanations to understand this
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ val) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x65: { // ADC zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u16 result = cpu->a + val + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ val) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 3;
+            break;
+        }
+        case 0x6D: { // ADC absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u16 result = cpu->a + val + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ val) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== SBC - Subtract with Carry =====
+        // its like ADC but you invert the value. seriously thats it
+        // ...i think
+        case 0xE9: { // SBC immediate
+            u16 addr = addr_immediate(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 inverted = val ^ 0xFF; // ones complement, same as ~val but clearer maybe
+            u16 result = cpu->a + inverted + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ inverted) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0xE5: { // SBC zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 inverted = val ^ 0xFF;
+            u16 result = cpu->a + inverted + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ inverted) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 3;
+            break;
+        }
+        case 0xED: { // SBC absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 inverted = val ^ 0xFF;
+            u16 result = cpu->a + inverted + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ inverted) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== AND =====
+        case 0x29: { // AND immediate
+            u16 addr = addr_immediate(cpu);
+            cpu->a &= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x25: { // AND zero page
+            u16 addr = addr_zeropage(cpu);
+            cpu->a &= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 3;
+            break;
+        }
+        case 0x2D: { // AND absolute
+            u16 addr = addr_absolute(cpu);
+            cpu->a &= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== ORA - OR =====
+        case 0x09: { // ORA immediate
+            u16 addr = addr_immediate(cpu);
+            cpu->a |= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x05: { // ORA zero page
+            u16 addr = addr_zeropage(cpu);
+            cpu->a |= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 3;
+            break;
+        }
+        case 0x0D: { // ORA absolute
+            u16 addr = addr_absolute(cpu);
+            cpu->a |= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== EOR - XOR =====
+        case 0x49: { // EOR immediate
+            u16 addr = addr_immediate(cpu);
+            cpu->a ^= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x45: { // EOR zero page
+            u16 addr = addr_zeropage(cpu);
+            cpu->a ^= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 3;
+            break;
+        }
+        case 0x4D: { // EOR absolute
+            u16 addr = addr_absolute(cpu);
+            cpu->a ^= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== CMP - Compare Accumulator =====
+        case 0xC9: { // CMP immediate
+            u16 addr = addr_immediate(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->a >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->a == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->a - val) & 0x80);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0xC5: { // CMP zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->a >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->a == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->a - val) & 0x80);
+            cpu->cycles += 3;
+            break;
+        }
+        case 0xCD: { // CMP absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->a >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->a == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->a - val) & 0x80);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== CPX - Compare X =====
+        case 0xE0: { // CPX immediate
+            u16 addr = addr_immediate(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->x >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->x == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->x - val) & 0x80);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0xE4: { // CPX zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->x >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->x == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->x - val) & 0x80);
+            cpu->cycles += 3;
+            break;
+        }
+
+        // ===== CPY - Compare Y =====
+        case 0xC0: { // CPY immediate
+            u16 addr = addr_immediate(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->y >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->y == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->y - val) & 0x80);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0xC4: { // CPY zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->y >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->y == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->y - val) & 0x80);
+            cpu->cycles += 3;
+            break;
+        }
+
+        // ===== BRANCHES =====
+        // all branches work the same way: check flag, jump if condition met
+        case 0x10: { // BPL - branch if positive (N=0)
+            u16 addr = addr_relative(cpu);
+            if (!cpu_get_flag(cpu, FLAG_N)) {
+                cpu->pc = addr;
+                cpu->cycles++; // +1 for taking the branch
+            }
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x30: { // BMI - branch if minus (N=1)
+            u16 addr = addr_relative(cpu);
+            if (cpu_get_flag(cpu, FLAG_N)) {
+                cpu->pc = addr;
+                cpu->cycles++;
+            }
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x50: { // BVC - branch if overflow clear
+            u16 addr = addr_relative(cpu);
+            if (!cpu_get_flag(cpu, FLAG_V)) {
+                cpu->pc = addr;
+                cpu->cycles++;
+            }
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x70: { // BVS - branch if overflow set
+            u16 addr = addr_relative(cpu);
+            if (cpu_get_flag(cpu, FLAG_V)) {
+                cpu->pc = addr;
+                cpu->cycles++;
+            }
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x90: { // BCC - branch if carry clear
+            u16 addr = addr_relative(cpu);
+            if (!cpu_get_flag(cpu, FLAG_C)) {
+                cpu->pc = addr;
+                cpu->cycles++;
+            }
+            cpu->cycles += 2;
+            break;
+        }
+        case 0xB0: { // BCS - branch if carry set
+            u16 addr = addr_relative(cpu);
+            if (cpu_get_flag(cpu, FLAG_C)) {
+                cpu->pc = addr;
+                cpu->cycles++;
+            }
+            cpu->cycles += 2;
+            break;
+        }
+        case 0xD0: { // BNE - branch if not equal (Z=0)
+            u16 addr = addr_relative(cpu);
+            if (!cpu_get_flag(cpu, FLAG_Z)) {
+                cpu->pc = addr;
+                cpu->cycles++;
+            }
+            cpu->cycles += 2;
+            break;
+        }
+        case 0xF0: { // BEQ - branch if equal (Z=1)
+            u16 addr = addr_relative(cpu);
+            if (cpu_get_flag(cpu, FLAG_Z)) {
+                cpu->pc = addr;
+                cpu->cycles++;
+            }
+            cpu->cycles += 2;
+            break;
+        }
+
+        // ===== INC/DEC memory =====
+        case 0xE6: { // INC zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr) + 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 5;
+            break;
+        }
+        case 0xEE: { // INC absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr) + 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0xC6: { // DEC zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr) - 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 5;
+            break;
+        }
+        case 0xCE: { // DEC absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr) - 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+
+        // ===== SHIFTS AND ROTATES =====
+        case 0x0A: { // ASL accumulator
+            cpu_set_flag(cpu, FLAG_C, cpu->a & 0x80);
+            cpu->a <<= 1;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x06: { // ASL zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, val & 0x80);
+            val <<= 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 5;
+            break;
+        }
+        case 0x4A: { // LSR accumulator
+            cpu_set_flag(cpu, FLAG_C, cpu->a & 0x01);
+            cpu->a >>= 1;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x46: { // LSR zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, val & 0x01);
+            val >>= 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 5;
+            break;
+        }
+        case 0x2A: { // ROL accumulator
+            u8 old_carry = cpu_get_flag(cpu, FLAG_C) ? 1 : 0;
+            cpu_set_flag(cpu, FLAG_C, cpu->a & 0x80);
+            cpu->a = (cpu->a << 1) | old_carry;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x26: { // ROL zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 old_carry = cpu_get_flag(cpu, FLAG_C) ? 1 : 0;
+            cpu_set_flag(cpu, FLAG_C, val & 0x80);
+            val = (val << 1) | old_carry;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 5;
+            break;
+        }
+        case 0x6A: { // ROR accumulator
+            u8 old_carry = cpu_get_flag(cpu, FLAG_C) ? 0x80 : 0;
+            cpu_set_flag(cpu, FLAG_C, cpu->a & 0x01);
+            cpu->a = (cpu->a >> 1) | old_carry;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 2;
+            break;
+        }
+        case 0x66: { // ROR zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 old_carry = cpu_get_flag(cpu, FLAG_C) ? 0x80 : 0;
+            cpu_set_flag(cpu, FLAG_C, val & 0x01);
+            val = (val >> 1) | old_carry;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 5;
+            break;
+        }
+
+        // ===== BIT =====
+        case 0x24: { // BIT zero page
+            u16 addr = addr_zeropage(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_Z, (cpu->a & val) == 0);
+            cpu_set_flag(cpu, FLAG_V, val & 0x40);
+            cpu_set_flag(cpu, FLAG_N, val & 0x80);
+            cpu->cycles += 3;
+            break;
+        }
+        case 0x2C: { // BIT absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_Z, (cpu->a & val) == 0);
+            cpu_set_flag(cpu, FLAG_V, val & 0x40);
+            cpu_set_flag(cpu, FLAG_N, val & 0x80);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== BRK and RTI =====
+        case 0x00: { // BRK
+            cpu->pc++; // BRK skips the next byte (padding byte)
+            cpu_push16(cpu, cpu->pc);
+            cpu_push(cpu, cpu->status | FLAG_B | FLAG_U);
+            cpu_set_flag(cpu, FLAG_I, true);
+            u8 lo = cpu_read(cpu, 0xFFFE);
+            u8 hi = cpu_read(cpu, 0xFFFF);
+            cpu->pc = (hi << 8) | lo;
+            cpu->cycles += 7;
+            break;
+        }
+        case 0x40: { // RTI - return from interrupt
+            cpu->status = cpu_pop(cpu);
+            cpu_set_flag(cpu, FLAG_B, false);
+            cpu_set_flag(cpu, FLAG_U, true);
+            cpu->pc = cpu_pop16(cpu);
+            cpu->cycles += 6;
+            break;
+        }
 
         default:
             printf("[CPU] ERROR: unknown opcode 0x%02X at PC=0x%04X\n", 

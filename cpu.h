@@ -43,4 +43,7 @@ bool cpu_get_flag(CPU *cpu, u8 flag);
 // these two flags get set so often im making helpers
 void cpu_update_zero_and_negative(CPU *cpu, u8 value);
 
+// load raw bytes into memory (temporary until proper rom loading)
+void cpu_load_program(CPU *cpu, u8 *program, u16 size, u16 offset);
+
 #endif
