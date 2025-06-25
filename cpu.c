@@ -1,35 +1,39 @@
 #include "cpu.h"
+#include "bus.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
-// ok so the 6502 is an 8-bit processor with a 16-bit address bus
-// it can address 64KB of memory
-// the NES has its own memory map but for now lets just use a flat array
-// ill refactor this later when i add the actual bus... probably
+// ok so the cpu needs access to the bus for memory reads/writes
+// this is a circular dependency which is kinda ugly but whatever
+// ill make it work by passing a void pointer and casting it
+// there might be a better way to do this but im tired
 
-// TEMPORARY - just ram for now, will replace with proper bus later
-static u8 memory[0x10000]; // 64KB, fight me
+static Bus *cpu_bus = NULL;
 
-// read/write memory - super basic for now
+void cpu_set_bus(void *bus) {
+    cpu_bus = (Bus*)bus;
+}
+
+// read/write through the bus
 u8 cpu_read(CPU *cpu, u16 addr) {
-    // TODO: replace this with actual bus reads
-    // this is gonna need to talk to PPU, APU, cartridge, etc
-    return memory[addr];
+    (void)cpu; // unused now, might remove from signature later
+    if (cpu_bus) {
+        return bus_read(cpu_bus, addr);
+    }
+    return 0;
 }
 
 void cpu_write(CPU *cpu, u16 addr, u8 val) {
-    // TODO: same as above, bus writes
-    memory[addr] = val;
+    (void)cpu;
+    if (cpu_bus) {
+        bus_write(cpu_bus, addr, val);
+    }
 }
-
 
 void cpu_init(CPU *cpu) {
     // zero out everything
     memset(cpu, 0, sizeof(CPU));
-    
-    // also zero memory while were at it
-    memset(memory, 0, sizeof(memory));
     
     printf("[CPU] initialized\n");
 }
@@ -973,13 +977,4 @@ void cpu_step(CPU *cpu) {
             exit(1);
             break;
     }
-}
-
-// load raw bytes into memory at a specific address
-// this is temporary until i have proper ROM loading
-void cpu_load_program(CPU *cpu, u8 *program, u16 size, u16 offset) {
-    for (int i = 0; i < size; i++) {
-        memory[offset + i] = program[i];
-    }
-    printf("[CPU] loaded %d bytes at 0x%04X\n", size, offset);
 }
