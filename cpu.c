@@ -968,7 +968,531 @@ void cpu_step(CPU *cpu) {
             cpu->cycles += 6;
             break;
         }
+                // ===== More LDA addressing modes =====
+        // (we had most of these but lets make sure)
+        
+        // ===== More LDX addressing modes =====
+        case 0xB6: { // LDX zero page Y
+            u16 addr = addr_zeropage_y(cpu);
+            cpu->x = cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->x);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0xBE: { // LDX absolute Y
+            u16 addr = addr_absolute_y(cpu);
+            cpu->x = cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->x);
+            cpu->cycles += 4;
+            break;
+        }
 
+        // ===== More LDY addressing modes =====
+        case 0xB4: { // LDY zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            cpu->y = cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->y);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0xBC: { // LDY absolute X
+            u16 addr = addr_absolute_x(cpu);
+            cpu->y = cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->y);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== More STA addressing modes =====
+        case 0x81: { // STA (indirect,X)
+            u16 addr = addr_indexed_indirect(cpu);
+            cpu_write(cpu, addr, cpu->a);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x91: { // STA (indirect),Y
+            u16 addr = addr_indirect_indexed(cpu);
+            cpu_write(cpu, addr, cpu->a);
+            cpu->cycles += 6;
+            break;
+        }
+
+        // ===== More STX =====
+        case 0x96: { // STX zero page Y
+            u16 addr = addr_zeropage_y(cpu);
+            cpu_write(cpu, addr, cpu->x);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== More STY =====
+        case 0x94: { // STY zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            cpu_write(cpu, addr, cpu->y);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== More ADC =====
+        case 0x75: { // ADC zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u16 result = cpu->a + val + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ val) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x7D: { // ADC absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u16 result = cpu->a + val + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ val) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x79: { // ADC absolute Y
+            u16 addr = addr_absolute_y(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u16 result = cpu->a + val + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ val) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x61: { // ADC (indirect,X)
+            u16 addr = addr_indexed_indirect(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u16 result = cpu->a + val + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ val) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x71: { // ADC (indirect),Y
+            u16 addr = addr_indirect_indexed(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u16 result = cpu->a + val + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ val) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 5;
+            break;
+        }
+
+        // ===== More SBC =====
+        case 0xF5: { // SBC zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 inv = val ^ 0xFF;
+            u16 result = cpu->a + inv + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ inv) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0xFD: { // SBC absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 inv = val ^ 0xFF;
+            u16 result = cpu->a + inv + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ inv) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0xF9: { // SBC absolute Y
+            u16 addr = addr_absolute_y(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 inv = val ^ 0xFF;
+            u16 result = cpu->a + inv + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ inv) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0xE1: { // SBC (indirect,X)
+            u16 addr = addr_indexed_indirect(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 inv = val ^ 0xFF;
+            u16 result = cpu->a + inv + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ inv) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0xF1: { // SBC (indirect),Y
+            u16 addr = addr_indirect_indexed(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 inv = val ^ 0xFF;
+            u16 result = cpu->a + inv + (cpu_get_flag(cpu, FLAG_C) ? 1 : 0);
+            cpu_set_flag(cpu, FLAG_V, (~(cpu->a ^ inv) & (cpu->a ^ result)) & 0x80);
+            cpu_set_flag(cpu, FLAG_C, result > 0xFF);
+            cpu->a = result & 0xFF;
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 5;
+            break;
+        }
+
+        // ===== More AND =====
+        case 0x35: { // AND zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            cpu->a &= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x3D: { // AND absolute X
+            u16 addr = addr_absolute_x(cpu);
+            cpu->a &= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x39: { // AND absolute Y
+            u16 addr = addr_absolute_y(cpu);
+            cpu->a &= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x21: { // AND (indirect,X)
+            u16 addr = addr_indexed_indirect(cpu);
+            cpu->a &= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x31: { // AND (indirect),Y
+            u16 addr = addr_indirect_indexed(cpu);
+            cpu->a &= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 5;
+            break;
+        }
+
+        // ===== More ORA =====
+        case 0x15: { // ORA zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            cpu->a |= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x1D: { // ORA absolute X
+            u16 addr = addr_absolute_x(cpu);
+            cpu->a |= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x19: { // ORA absolute Y
+            u16 addr = addr_absolute_y(cpu);
+            cpu->a |= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x01: { // ORA (indirect,X)
+            u16 addr = addr_indexed_indirect(cpu);
+            cpu->a |= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x11: { // ORA (indirect),Y
+            u16 addr = addr_indirect_indexed(cpu);
+            cpu->a |= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 5;
+            break;
+        }
+
+        // ===== More EOR =====
+        case 0x55: { // EOR zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            cpu->a ^= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x5D: { // EOR absolute X
+            u16 addr = addr_absolute_x(cpu);
+            cpu->a ^= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x59: { // EOR absolute Y
+            u16 addr = addr_absolute_y(cpu);
+            cpu->a ^= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0x41: { // EOR (indirect,X)
+            u16 addr = addr_indexed_indirect(cpu);
+            cpu->a ^= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x51: { // EOR (indirect),Y
+            u16 addr = addr_indirect_indexed(cpu);
+            cpu->a ^= cpu_read(cpu, addr);
+            cpu_update_zero_and_negative(cpu, cpu->a);
+            cpu->cycles += 5;
+            break;
+        }
+
+        // ===== More CMP =====
+        case 0xD5: { // CMP zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->a >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->a == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->a - val) & 0x80);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0xDD: { // CMP absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->a >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->a == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->a - val) & 0x80);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0xD9: { // CMP absolute Y
+            u16 addr = addr_absolute_y(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->a >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->a == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->a - val) & 0x80);
+            cpu->cycles += 4;
+            break;
+        }
+        case 0xC1: { // CMP (indirect,X)
+            u16 addr = addr_indexed_indirect(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->a >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->a == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->a - val) & 0x80);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0xD1: { // CMP (indirect),Y
+            u16 addr = addr_indirect_indexed(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->a >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->a == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->a - val) & 0x80);
+            cpu->cycles += 5;
+            break;
+        }
+
+        // ===== More CPX =====
+        case 0xEC: { // CPX absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->x >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->x == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->x - val) & 0x80);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== More CPY =====
+        case 0xCC: { // CPY absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, cpu->y >= val);
+            cpu_set_flag(cpu, FLAG_Z, cpu->y == val);
+            cpu_set_flag(cpu, FLAG_N, (cpu->y - val) & 0x80);
+            cpu->cycles += 4;
+            break;
+        }
+
+        // ===== More INC/DEC =====
+        case 0xF6: { // INC zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr) + 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0xFE: { // INC absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr) + 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 7;
+            break;
+        }
+        case 0xD6: { // DEC zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr) - 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0xDE: { // DEC absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr) - 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 7;
+            break;
+        }
+
+        // ===== More shifts =====
+        case 0x16: { // ASL zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, val & 0x80);
+            val <<= 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x0E: { // ASL absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, val & 0x80);
+            val <<= 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x1E: { // ASL absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, val & 0x80);
+            val <<= 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 7;
+            break;
+        }
+        case 0x56: { // LSR zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, val & 0x01);
+            val >>= 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x4E: { // LSR absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, val & 0x01);
+            val >>= 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x5E: { // LSR absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            cpu_set_flag(cpu, FLAG_C, val & 0x01);
+            val >>= 1;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 7;
+            break;
+        }
+        case 0x36: { // ROL zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 old_c = cpu_get_flag(cpu, FLAG_C) ? 1 : 0;
+            cpu_set_flag(cpu, FLAG_C, val & 0x80);
+            val = (val << 1) | old_c;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x2E: { // ROL absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 old_c = cpu_get_flag(cpu, FLAG_C) ? 1 : 0;
+            cpu_set_flag(cpu, FLAG_C, val & 0x80);
+            val = (val << 1) | old_c;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x3E: { // ROL absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 old_c = cpu_get_flag(cpu, FLAG_C) ? 1 : 0;
+            cpu_set_flag(cpu, FLAG_C, val & 0x80);
+            val = (val << 1) | old_c;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 7;
+            break;
+        }
+        case 0x76: { // ROR zero page X
+            u16 addr = addr_zeropage_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 old_c = cpu_get_flag(cpu, FLAG_C) ? 0x80 : 0;
+            cpu_set_flag(cpu, FLAG_C, val & 0x01);
+            val = (val >> 1) | old_c;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x6E: { // ROR absolute
+            u16 addr = addr_absolute(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 old_c = cpu_get_flag(cpu, FLAG_C) ? 0x80 : 0;
+            cpu_set_flag(cpu, FLAG_C, val & 0x01);
+            val = (val >> 1) | old_c;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 6;
+            break;
+        }
+        case 0x7E: { // ROR absolute X
+            u16 addr = addr_absolute_x(cpu);
+            u8 val = cpu_read(cpu, addr);
+            u8 old_c = cpu_get_flag(cpu, FLAG_C) ? 0x80 : 0;
+            cpu_set_flag(cpu, FLAG_C, val & 0x01);
+            val = (val >> 1) | old_c;
+            cpu_write(cpu, addr, val);
+            cpu_update_zero_and_negative(cpu, val);
+            cpu->cycles += 7;
+            break;
+        }
         default:
             printf("[CPU] ERROR: unknown opcode 0x%02X at PC=0x%04X\n", 
                    opcode, cpu->pc - 1);
