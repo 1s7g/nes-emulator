@@ -49,9 +49,22 @@ u8 bus_read(Bus *bus, u16 addr) {
         return bus->ram[addr & 0x07FF];
     }
     else if (addr < 0x4000) {
-        // PPU registers (mirrored)
-        // TODO: implement PPU
-        //printf("[BUS] PPU read at $%04X (not implemented)\n", addr);
+        // PPU registers (mirrored every 8 bytes)
+        u16 ppu_reg = 0x2000 + (addr & 0x0007);
+        
+        if (ppu_reg == 0x2002) {
+            // HACK: fake the vblank flag so games dont get stuck
+            // in their "wait for vblank" loops
+            // real ppu will replace this later obviously
+            // just toggle bit 7 based on cycle count or something
+            static int fake_vblank_counter = 0;
+            fake_vblank_counter++;
+            if (fake_vblank_counter > 3) {
+                fake_vblank_counter = 0;
+                return 0x80; // vblank flag set
+            }
+        }
+        
         return 0;
     }
     else if (addr < 0x4020) {
