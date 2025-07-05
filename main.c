@@ -33,9 +33,13 @@ int main(int argc, char *argv[]) {
     bus_reset(&bus);
     
     // run some instructions to see if it works
-    printf("\n--- executing first 20 instructions ---\n");
-    for (int i = 0; i < 20; i++) {
-        cpu_print_state(&bus.cpu);
+    printf("\n--- running cpu ---\n");
+    for (int i = 0; i < 50000; i++) {
+        // only print every 5000 steps
+        if (i % 5000 == 0 || i > 49990) {
+            printf("[%d] ", i);
+            cpu_print_state(&bus.cpu);
+        }
         cpu_step(&bus.cpu);
     }
     printf("--- done ---\n");
