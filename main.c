@@ -4,21 +4,23 @@
 #include "bus.h"
 
 // NES Emulator
-// now with SDL! maybe i can actually see something on screen soon
+// we have a ppu now! sorta
 
 int main(int argc, char *argv[]) {
     printf("=== NES Emulator ===\n");
-    printf("version 0.2.0 (sdl works?)\n\n");
+    printf("version 0.3.0 (ppu exists now)\n\n");
+    
+    if (argc < 2) {
+        printf("Usage: nes <rom.nes>\n");
+        return 1;
+    }
     
     // init SDL
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
-    printf("SDL initialized!\n");
     
-    // NES resolution is 256x240
-    // but thats tiny so lets scale it up
     int scale = 3;
     SDL_Window *window = SDL_CreateWindow(
         "NES Emulator",
@@ -27,57 +29,34 @@ int main(int argc, char *argv[]) {
         SDL_WINDOW_SHOWN
     );
     
-    if (!window) {
-        printf("SDL_CreateWindow failed: %s\n", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
-    
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1,
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     
-    if (!renderer) {
-        printf("SDL_CreateRenderer failed: %s\n", SDL_GetError());
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
-    
-    // create a texture for the NES screen (256x240 pixels)
     SDL_Texture *texture = SDL_CreateTexture(renderer,
         SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING,
         256, 240);
     
-    if (!texture) {
-        printf("SDL_CreateTexture failed: %s\n", SDL_GetError());
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
+    // init emulator
+    Bus bus;
+    bus_init(&bus);
+    cpu_set_bus(&bus);
+    bus_load_cartridge(&bus, argv[1]);
+    
+    if (bus.cart.prg_rom == NULL) {
+        printf("Failed to load ROM\n");
         return 1;
     }
     
-    printf("window created! (256x240 scaled %dx)\n", scale);
+    bus_reset(&bus);
     
-    // for now just fill the screen with a color to prove it works
-    u32 pixels[256 * 240];
-    for (int i = 0; i < 256 * 240; i++) {
-        // make a nice gradient or something idk
-        int x = i % 256;
-        int y = i / 256;
-        pixels[i] = 0xFF000000 | (x << 16) | (y << 8) | ((x + y) & 0xFF);
-    }
-    
-    SDL_UpdateTexture(texture, NULL, pixels, 256 * sizeof(u32));
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, texture, NULL, NULL);
-    SDL_RenderPresent(renderer);
-    
-    // wait for user to close window
-    printf("showing test pattern, close window to exit\n");
+    // main loop
+    printf("\n--- running ---\n");
     bool running = true;
     SDL_Event event;
+    
     while (running) {
+        // handle events
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
@@ -86,7 +65,24 @@ int main(int argc, char *argv[]) {
                 running = false;
             }
         }
-        SDL_Delay(16); // ~60fps, dont burn cpu
+        
+        // run one frame
+        // NES runs at ~60fps, each frame is about 29780 cpu cycles
+        // ppu runs 3x faster than cpu
+        bus.ppu.frame_ready = false;
+        while (!bus.ppu.frame_ready) {
+            cpu_step(&bus.cpu);
+            // ppu runs 3 cycles per cpu cycle
+            ppu_step(&bus.ppu);
+            ppu_step(&bus.ppu);
+            ppu_step(&bus.ppu);
+        }
+        
+        // display
+        SDL_UpdateTexture(texture, NULL, bus.ppu.framebuffer, 256 * sizeof(u32));
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+        SDL_RenderPresent(renderer);
     }
     
     // cleanup
@@ -94,6 +90,7 @@ int main(int argc, char *argv[]) {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+    cartridge_free(&bus.cart);
     
     printf("bye!\n");
     return 0;

@@ -4,19 +4,14 @@
 #include "types.h"
 #include "cpu.h"
 #include "cartridge.h"
+#include "ppu.h"
 
-// the bus connects all the components together
-// cpu reads/writes go through here and get routed to the right place
-
-typedef struct {
+typedef struct Bus {
     CPU cpu;
+    PPU ppu;
     Cartridge cart;
     
-    u8 ram[2048];  // 2KB internal RAM (mirrored a bunch of times)
-    
-    // ppu will go here eventually
-    // apu will go here eventually
-    // controllers will go here eventually
+    u8 ram[2048];
     
 } Bus;
 
