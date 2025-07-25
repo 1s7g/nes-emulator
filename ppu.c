@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 
+// forward declarations for helper functions
+void ppu_get_pattern_row(PPU *ppu, u8 tile_id, int row, bool table, u8 *low, u8 *high);
+u8 ppu_get_pixel_from_pattern(u8 low, u8 high, int x);
+
 // NES color palette - these are the actual RGB colors the NES can display
 // theres like a million different "correct" palettes, this is just one of them
 static const u32 nes_palette[64] = {
@@ -245,46 +249,101 @@ void ppu_write_register(PPU *ppu, u16 addr, u8 val) {
 }
 
 
+// fetch a tile from pattern table
+void ppu_get_pattern_row(PPU *ppu, u8 tile_id, int row, bool table, u8 *low, u8 *high) {
+    // each tile is 16 bytes (8 rows x 2 planes)
+    // table 0 = $0000, table 1 = $1000
+    u16 base = table ? 0x1000 : 0x0000;
+    u16 addr = base + (tile_id * 16) + row;
+    
+    *low = ppu_read_vram(ppu, addr);
+    *high = ppu_read_vram(ppu, addr + 8);
+}
+
+// get pixel color (0-3) from pattern data
+u8 ppu_get_pixel_from_pattern(u8 low, u8 high, int x) {
+    // x is 0-7, leftmost pixel is bit 7
+    int shift = 7 - x;
+    u8 lo_bit = (low >> shift) & 1;
+    u8 hi_bit = (high >> shift) & 1;
+    return (hi_bit << 1) | lo_bit;
+}
+
 // one ppu cycle
 void ppu_step(PPU *ppu) {
-    // NES PPU timing:
-    // 262 scanlines per frame (0-261)
-    // 341 cycles per scanline (0-340)
-    // scanlines 0-239 are visible
-    // scanline 240 is post-render (idle)
-    // scanline 241 is where vblank starts
-    // scanlines 241-260 are vblank
-    // scanline 261 is pre-render
+    // visible scanlines: 0-239
+    // post-render: 240
+    // vblank: 241-260
+    // pre-render: 261
     
-    // for now just handle the vblank flag and frame timing
-    // actual rendering comes later lol
+    bool rendering_enabled = (ppu->mask & (PPUMASK_SHOW_BG | PPUMASK_SHOW_SPR)) != 0;
+    bool visible_scanline = ppu->scanline < 240;
+    bool visible_cycle = ppu->cycle >= 1 && ppu->cycle <= 256;
     
-    // vblank starts at scanline 241, cycle 1
+    // vblank flag
     if (ppu->scanline == 241 && ppu->cycle == 1) {
         ppu->status |= PPUSTATUS_VBLANK;
         ppu->frame_ready = true;
-        // TODO: trigger NMI if enabled
     }
     
-    // vblank ends at scanline 261 (pre-render), cycle 1
     if (ppu->scanline == 261 && ppu->cycle == 1) {
         ppu->status &= ~PPUSTATUS_VBLANK;
         ppu->status &= ~PPUSTATUS_SPRITE_ZERO;
         ppu->status &= ~PPUSTATUS_OVERFLOW;
     }
     
-    // TODO: actual rendering during visible scanlines
-    // for now just draw a test pattern so we can see something
-    if (ppu->scanline < 240 && ppu->cycle < 256) {
-        int x = ppu->cycle;
+    // render a pixel
+    if (visible_scanline && visible_cycle) {
+        int x = ppu->cycle - 1;
         int y = ppu->scanline;
+        u32 color = nes_palette[ppu->palette[0] & 0x3F]; // default bg
         
-        // just draw the background color from palette for now
-        u8 bg_color = ppu->palette[0] & 0x3F;
-        ppu->framebuffer[y * 256 + x] = nes_palette[bg_color];
+        // background rendering
+        if (ppu->mask & PPUMASK_SHOW_BG) {
+            // figure out which nametable tile we're in
+            // each tile is 8x8 pixels
+            // nametable is 32x30 tiles
+            
+            int tile_x = x / 8;
+            int tile_y = y / 8;
+            int fine_x = x % 8;
+            int fine_y = y % 8;
+            
+            // get nametable base (simplified, ignoring scroll for now)
+            // nametable 0 is at $2000
+            u16 nt_addr = 0x2000 + tile_y * 32 + tile_x;
+            u8 tile_id = ppu_read_vram(ppu, nt_addr);
+            
+            // get attribute byte
+            // attributes are at end of nametable, each byte covers 4x4 tiles
+            int attr_x = tile_x / 4;
+            int attr_y = tile_y / 4;
+            u16 attr_addr = 0x23C0 + attr_y * 8 + attr_x;
+            u8 attr_byte = ppu_read_vram(ppu, attr_addr);
+            
+            // extract the 2-bit palette for this 2x2 tile area
+            int shift = ((tile_y % 4) / 2) * 4 + ((tile_x % 4) / 2) * 2;
+            u8 palette_id = (attr_byte >> shift) & 0x03;
+            
+            // get pattern data
+            bool bg_table = (ppu->ctrl & PPUCTRL_BG_TABLE) != 0;
+            u8 pattern_low, pattern_high;
+            ppu_get_pattern_row(ppu, tile_id, fine_y, bg_table, &pattern_low, &pattern_high);
+            
+            // get pixel color (0-3)
+            u8 pixel = ppu_get_pixel_from_pattern(pattern_low, pattern_high, fine_x);
+            
+            if (pixel != 0) {
+                // non-transparent, look up actual color
+                u8 palette_index = ppu->palette[palette_id * 4 + pixel];
+                color = nes_palette[palette_index & 0x3F];
+            }
+        }
+        
+        ppu->framebuffer[y * 256 + x] = color;
     }
     
-    // advance cycle/scanline
+    // advance
     ppu->cycle++;
     if (ppu->cycle > 340) {
         ppu->cycle = 0;
