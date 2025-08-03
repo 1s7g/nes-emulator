@@ -4,18 +4,17 @@
 #include "bus.h"
 
 // NES Emulator
-// we have a ppu now! sorta
+// now with controller input!
 
 int main(int argc, char *argv[]) {
     printf("=== NES Emulator ===\n");
-    printf("version 0.3.0 (ppu exists now)\n\n");
+    printf("version 0.4.0 (controller support)\n\n");
     
     if (argc < 2) {
         printf("Usage: nes <rom.nes>\n");
         return 1;
     }
     
-    // init SDL
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("SDL_Init failed: %s\n", SDL_GetError());
         return 1;
@@ -37,7 +36,6 @@ int main(int argc, char *argv[]) {
         SDL_TEXTUREACCESS_STREAMING,
         256, 240);
     
-    // init emulator
     Bus bus;
     bus_init(&bus);
     cpu_set_bus(&bus);
@@ -50,13 +48,20 @@ int main(int argc, char *argv[]) {
     
     bus_reset(&bus);
     
-    // main loop
-    printf("\n--- running ---\n");
+    printf("\n--- controls ---\n");
+    printf("Arrow keys = D-pad\n");
+    printf("Z = A button\n");
+    printf("X = B button\n");
+    printf("Enter = Start\n");
+    printf("Shift = Select\n");
+    printf("Escape = Quit\n");
+    printf("----------------\n\n");
+    
     bool running = true;
     SDL_Event event;
     
     while (running) {
-        // handle events
+        // handle input
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
@@ -66,13 +71,32 @@ int main(int argc, char *argv[]) {
             }
         }
         
+        // get keyboard state
+        const u8 *keys = SDL_GetKeyboardState(NULL);
+        u8 buttons = 0;
+        
+        if (keys[SDL_SCANCODE_Z])      buttons |= BTN_A;
+        if (keys[SDL_SCANCODE_X])      buttons |= BTN_B;
+        if (keys[SDL_SCANCODE_RSHIFT] || keys[SDL_SCANCODE_LSHIFT]) 
+                                        buttons |= BTN_SELECT;
+        if (keys[SDL_SCANCODE_RETURN]) buttons |= BTN_START;
+        if (keys[SDL_SCANCODE_UP])     buttons |= BTN_UP;
+        if (keys[SDL_SCANCODE_DOWN])   buttons |= BTN_DOWN;
+        if (keys[SDL_SCANCODE_LEFT])   buttons |= BTN_LEFT;
+        if (keys[SDL_SCANCODE_RIGHT])  buttons |= BTN_RIGHT;
+        
+        controller_set_buttons(&bus.controller1, buttons);
+        
         // run one frame
-        // NES runs at ~60fps, each frame is about 29780 cpu cycles
-        // ppu runs 3x faster than cpu
         bus.ppu.frame_ready = false;
         while (!bus.ppu.frame_ready) {
+            // check for NMI
+            if (bus.ppu.nmi_triggered) {
+                bus.ppu.nmi_triggered = false;
+                cpu_nmi(&bus.cpu);
+            }
+            
             cpu_step(&bus.cpu);
-            // ppu runs 3 cycles per cpu cycle
             ppu_step(&bus.ppu);
             ppu_step(&bus.ppu);
             ppu_step(&bus.ppu);
@@ -85,7 +109,6 @@ int main(int argc, char *argv[]) {
         SDL_RenderPresent(renderer);
     }
     
-    // cleanup
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

@@ -6,6 +6,8 @@ void bus_init(Bus *bus) {
     memset(bus->ram, 0, sizeof(bus->ram));
     cpu_init(&bus->cpu);
     ppu_init(&bus->ppu);
+    controller_init(&bus->controller1);
+    controller_init(&bus->controller2);
     printf("[BUS] initialized\n");
 }
 
@@ -13,7 +15,6 @@ void bus_load_cartridge(Bus *bus, const char *filename) {
     if (cartridge_load(&bus->cart, filename)) {
         cartridge_print_info(&bus->cart);
         
-        // give ppu access to chr rom
         bus->ppu.chr_rom = bus->cart.chr_rom;
         bus->ppu.chr_size = bus->cart.chr_size;
         bus->ppu.mirroring = bus->cart.mirroring;
@@ -42,16 +43,21 @@ u8 bus_read(Bus *bus, u16 addr) {
         return bus->ram[addr & 0x07FF];
     }
     else if (addr < 0x4000) {
-        // PPU registers
         return ppu_read_register(&bus->ppu, addr);
     }
+    else if (addr == 0x4016) {
+        // controller 1
+        return controller_read(&bus->controller1);
+    }
+    else if (addr == 0x4017) {
+        // controller 2
+        return controller_read(&bus->controller2);
+    }
     else if (addr < 0x4020) {
-        // APU and I/O
-        // TODO
+        // other APU/IO
         return 0;
     }
     else {
-        // cartridge
         if (addr >= 0x8000) {
             u32 mapped_addr = addr - 0x8000;
             if (bus->cart.prg_size == 16384) {
@@ -70,14 +76,23 @@ void bus_write(Bus *bus, u16 addr, u8 val) {
         bus->ram[addr & 0x07FF] = val;
     }
     else if (addr < 0x4000) {
-        // PPU registers
         ppu_write_register(&bus->ppu, addr, val);
     }
-    else if (addr < 0x4020) {
-        // APU and I/O
-        // TODO
+    else if (addr == 0x4014) {
+        // OAM DMA - this is important for sprites
+        // copies 256 bytes from CPU memory to OAM
+        u16 base = val << 8;
+        for (int i = 0; i < 256; i++) {
+            bus->ppu.oam[i] = bus_read(bus, base + i);
+        }
+        // DMA takes cpu cycles but we'll ignore that for now
     }
-    else {
-        // cartridge - usually ROM
+    else if (addr == 0x4016) {
+        // controller strobe
+        controller_write(&bus->controller1, val);
+        controller_write(&bus->controller2, val);
+    }
+    else if (addr < 0x4020) {
+        // APU stuff, ignore for now
     }
 }

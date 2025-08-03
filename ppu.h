@@ -66,6 +66,7 @@ typedef struct {
     // output
     u32 framebuffer[256 * 240];  // pixel output
     bool frame_ready;            // set when a frame is done
+    bool nmi_triggered;          // NMI needs to fire
     
     // we need chr rom access, will be set by bus
     u8 *chr_rom;

@@ -5,11 +5,14 @@
 #include "cpu.h"
 #include "cartridge.h"
 #include "ppu.h"
+#include "controller.h"
 
 typedef struct Bus {
     CPU cpu;
     PPU ppu;
     Cartridge cart;
+    Controller controller1;
+    Controller controller2;
     
     u8 ram[2048];
     

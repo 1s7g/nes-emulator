@@ -92,6 +92,21 @@ void cpu_push16(CPU *cpu, u16 val) {
     cpu_push(cpu, val & 0xFF);        // then low byte
 }
 
+void cpu_nmi(CPU *cpu) {
+    // NMI is like BRK but:
+    // - doesn't set B flag
+    // - reads vector from $FFFA instead of $FFFE
+    cpu_push16(cpu, cpu->pc);
+    cpu_push(cpu, (cpu->status | FLAG_U) & ~FLAG_B);
+    cpu_set_flag(cpu, FLAG_I, true);
+    
+    u8 lo = cpu_read(cpu, 0xFFFA);
+    u8 hi = cpu_read(cpu, 0xFFFB);
+    cpu->pc = (hi << 8) | lo;
+    
+    cpu->cycles += 7;
+}
+
 u16 cpu_pop16(CPU *cpu) {
     u16 lo = cpu_pop(cpu);
     u16 hi = cpu_pop(cpu);

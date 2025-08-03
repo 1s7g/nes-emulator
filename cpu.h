@@ -36,6 +36,7 @@ void cpu_reset(CPU *cpu);
 void cpu_step(CPU *cpu); // execute one instruction
 void cpu_print_state(CPU *cpu); // for debugging, gonna need this A LOT
 void cpu_set_bus(void *bus);
+void cpu_nmi(CPU *cpu);
 
 // helper stuff for flags
 void cpu_set_flag(CPU *cpu, u8 flag, bool value);

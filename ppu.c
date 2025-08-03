@@ -284,6 +284,10 @@ void ppu_step(PPU *ppu) {
     if (ppu->scanline == 241 && ppu->cycle == 1) {
         ppu->status |= PPUSTATUS_VBLANK;
         ppu->frame_ready = true;
+        // trigger NMI if enabled
+        if (ppu->ctrl & PPUCTRL_NMI_ENABLE) {
+            ppu->nmi_triggered = true;
+        }
     }
     
     if (ppu->scanline == 261 && ppu->cycle == 1) {
