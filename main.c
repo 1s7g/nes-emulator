@@ -4,7 +4,7 @@
 #include "bus.h"
 
 // NES Emulator
-// now with controller input!
+// debugging controller input, this is taking forever lol
 
 int main(int argc, char *argv[]) {
     printf("=== NES Emulator ===\n");
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     SDL_Event event;
     
     while (running) {
-        // handle input
+        // handle events
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
@@ -71,29 +71,25 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        // get keyboard state
-        const u8 *keys = SDL_GetKeyboardState(NULL);
-        u8 buttons = 0;
-        
-        if (keys[SDL_SCANCODE_Z])      buttons |= BTN_A;
-        if (keys[SDL_SCANCODE_X])      buttons |= BTN_B;
-        if (keys[SDL_SCANCODE_RSHIFT] || keys[SDL_SCANCODE_LSHIFT]) 
-                                        buttons |= BTN_SELECT;
-        if (keys[SDL_SCANCODE_RETURN]) buttons |= BTN_START;
-        if (keys[SDL_SCANCODE_UP])     buttons |= BTN_UP;
-        if (keys[SDL_SCANCODE_DOWN])   buttons |= BTN_DOWN;
-        if (keys[SDL_SCANCODE_LEFT])   buttons |= BTN_LEFT;
-        if (keys[SDL_SCANCODE_RIGHT])  buttons |= BTN_RIGHT;
-        
-        controller_set_buttons(&bus.controller1, buttons);
-        
         // run one frame
         bus.ppu.frame_ready = false;
         while (!bus.ppu.frame_ready) {
-            // check for NMI
             if (bus.ppu.nmi_triggered) {
                 bus.ppu.nmi_triggered = false;
                 cpu_nmi(&bus.cpu);
+                
+                const u8 *keys = SDL_GetKeyboardState(NULL);
+                u8 buttons = 0;
+                if (keys[SDL_SCANCODE_Z])      buttons |= BTN_A;
+                if (keys[SDL_SCANCODE_X])      buttons |= BTN_B;
+                if (keys[SDL_SCANCODE_RSHIFT] || keys[SDL_SCANCODE_LSHIFT])
+                                                buttons |= BTN_SELECT;
+                if (keys[SDL_SCANCODE_RETURN]) buttons |= BTN_START;
+                if (keys[SDL_SCANCODE_UP])     buttons |= BTN_UP;
+                if (keys[SDL_SCANCODE_DOWN])   buttons |= BTN_DOWN;
+                if (keys[SDL_SCANCODE_LEFT])   buttons |= BTN_LEFT;
+                if (keys[SDL_SCANCODE_RIGHT])  buttons |= BTN_RIGHT;
+                controller_set_buttons(&bus.controller1, buttons);
             }
             
             cpu_step(&bus.cpu);
@@ -109,6 +105,7 @@ int main(int argc, char *argv[]) {
         SDL_RenderPresent(renderer);
     }
     
+    // cleanup
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

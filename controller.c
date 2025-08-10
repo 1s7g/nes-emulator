@@ -7,10 +7,12 @@ void controller_init(Controller *ctrl) {
 }
 
 void controller_write(Controller *ctrl, u8 val) {
-    // bit 0 controls strobe
-    ctrl->strobe = (val & 0x01) != 0;
+    bool new_strobe = (val & 0x01) != 0;
+    ctrl->strobe = new_strobe;
+    
     if (ctrl->strobe) {
-        // while strobe is high, continuously reload shift register
+        ctrl->shift_reg = ctrl->buttons;
+    } else {
         ctrl->shift_reg = ctrl->buttons;
     }
 }
@@ -19,21 +21,19 @@ u8 controller_read(Controller *ctrl) {
     u8 result;
     
     if (ctrl->strobe) {
-        // strobe mode - always return A button state
-        result = ctrl->buttons & BTN_A ? 1 : 0;
+        result = (ctrl->buttons & BTN_A) ? 1 : 0;
     } else {
-        // return bit 0 of shift register, then shift
         result = ctrl->shift_reg & 0x01;
         ctrl->shift_reg >>= 1;
-        // after all 8 bits are read, returns 1s (open bus behavior)
         ctrl->shift_reg |= 0x80;
     }
     
-    // only bit 0 is controller data, rest is open bus
-    // but we just return 0 for those
-    return result;
+    return result & 0x01;
 }
 
 void controller_set_buttons(Controller *ctrl, u8 buttons) {
     ctrl->buttons = buttons;
+    if (ctrl->strobe) {
+        ctrl->shift_reg = buttons;
+    }
 }
