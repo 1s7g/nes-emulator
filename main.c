@@ -71,25 +71,34 @@ int main(int argc, char *argv[]) {
             }
         }
         
+        // update controller BEFORE the frame too
+        const u8 *keys = SDL_GetKeyboardState(NULL);
+
+         // debug: check right arrow specifically
+        if (keys[SDL_SCANCODE_RIGHT]) {
+            printf("[INPUT] RIGHT ARROW PRESSED (scancode works)\n");
+        }
+        u8 buttons = 0;
+        if (keys[SDL_SCANCODE_Z])      buttons |= BTN_A;
+        if (keys[SDL_SCANCODE_X])      buttons |= BTN_B;
+        if (keys[SDL_SCANCODE_RSHIFT] || keys[SDL_SCANCODE_LSHIFT])
+                                        buttons |= BTN_SELECT;
+        if (keys[SDL_SCANCODE_RETURN]) buttons |= BTN_START;
+        if (keys[SDL_SCANCODE_UP]    || keys[SDL_SCANCODE_W]) buttons |= BTN_UP;
+        if (keys[SDL_SCANCODE_DOWN]  || keys[SDL_SCANCODE_S]) buttons |= BTN_DOWN;
+        if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) buttons |= BTN_LEFT;
+        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) buttons |= BTN_RIGHT;
+        if (buttons != 0) {
+            printf("[INPUT] buttons: %02X\n", buttons);
+        }
+        controller_set_buttons(&bus.controller1, buttons);
+        
         // run one frame
         bus.ppu.frame_ready = false;
         while (!bus.ppu.frame_ready) {
             if (bus.ppu.nmi_triggered) {
                 bus.ppu.nmi_triggered = false;
                 cpu_nmi(&bus.cpu);
-                
-                const u8 *keys = SDL_GetKeyboardState(NULL);
-                u8 buttons = 0;
-                if (keys[SDL_SCANCODE_Z])      buttons |= BTN_A;
-                if (keys[SDL_SCANCODE_X])      buttons |= BTN_B;
-                if (keys[SDL_SCANCODE_RSHIFT] || keys[SDL_SCANCODE_LSHIFT])
-                                                buttons |= BTN_SELECT;
-                if (keys[SDL_SCANCODE_RETURN]) buttons |= BTN_START;
-                if (keys[SDL_SCANCODE_UP])     buttons |= BTN_UP;
-                if (keys[SDL_SCANCODE_DOWN])   buttons |= BTN_DOWN;
-                if (keys[SDL_SCANCODE_LEFT])   buttons |= BTN_LEFT;
-                if (keys[SDL_SCANCODE_RIGHT])  buttons |= BTN_RIGHT;
-                controller_set_buttons(&bus.controller1, buttons);
             }
             
             cpu_step(&bus.cpu);

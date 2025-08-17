@@ -295,50 +295,126 @@ void ppu_step(PPU *ppu) {
         ppu->status &= ~PPUSTATUS_OVERFLOW;
     }
     
-    // render a pixel
     if (visible_scanline && visible_cycle) {
         int x = ppu->cycle - 1;
         int y = ppu->scanline;
-        u32 color = nes_palette[ppu->palette[0] & 0x3F]; // default bg
+        u32 color = nes_palette[ppu->palette[0] & 0x3F];
+        u8 bg_pixel = 0; // track if bg pixel is transparent
         
-        // background rendering
+        // === BACKGROUND ===
         if (ppu->mask & PPUMASK_SHOW_BG) {
-            // figure out which nametable tile we're in
-            // each tile is 8x8 pixels
-            // nametable is 32x30 tiles
-            
             int tile_x = x / 8;
             int tile_y = y / 8;
             int fine_x = x % 8;
             int fine_y = y % 8;
             
-            // get nametable base (simplified, ignoring scroll for now)
-            // nametable 0 is at $2000
             u16 nt_addr = 0x2000 + tile_y * 32 + tile_x;
             u8 tile_id = ppu_read_vram(ppu, nt_addr);
             
-            // get attribute byte
-            // attributes are at end of nametable, each byte covers 4x4 tiles
             int attr_x = tile_x / 4;
             int attr_y = tile_y / 4;
             u16 attr_addr = 0x23C0 + attr_y * 8 + attr_x;
             u8 attr_byte = ppu_read_vram(ppu, attr_addr);
             
-            // extract the 2-bit palette for this 2x2 tile area
             int shift = ((tile_y % 4) / 2) * 4 + ((tile_x % 4) / 2) * 2;
             u8 palette_id = (attr_byte >> shift) & 0x03;
             
-            // get pattern data
             bool bg_table = (ppu->ctrl & PPUCTRL_BG_TABLE) != 0;
             u8 pattern_low, pattern_high;
             ppu_get_pattern_row(ppu, tile_id, fine_y, bg_table, &pattern_low, &pattern_high);
             
-            // get pixel color (0-3)
-            u8 pixel = ppu_get_pixel_from_pattern(pattern_low, pattern_high, fine_x);
+            bg_pixel = ppu_get_pixel_from_pattern(pattern_low, pattern_high, fine_x);
             
-            if (pixel != 0) {
-                // non-transparent, look up actual color
-                u8 palette_index = ppu->palette[palette_id * 4 + pixel];
+            if (bg_pixel != 0) {
+                u8 palette_index = ppu->palette[palette_id * 4 + bg_pixel];
+                color = nes_palette[palette_index & 0x3F];
+            }
+        }
+        
+        // === SPRITES ===
+        if (ppu->mask & PPUMASK_SHOW_SPR) {
+            // go through OAM in reverse so sprite 0 has highest priority
+            // (last one drawn wins, and we want sprite 0 on top)
+            
+            bool sprite_hit = false; // for sprite zero hit detection
+            
+            for (int i = 63; i >= 0; i--) {
+                u8 sprite_y    = ppu->oam[i * 4 + 0];
+                u8 sprite_tile = ppu->oam[i * 4 + 1];
+                u8 sprite_attr = ppu->oam[i * 4 + 2];
+                u8 sprite_x    = ppu->oam[i * 4 + 3];
+                
+                // sprite Y is actually Y-1 (sprites are delayed by 1 scanline)
+                sprite_y += 1;
+                
+                // check if this sprite is on the current scanline
+                int sprite_height = (ppu->ctrl & PPUCTRL_SPRITE_SIZE) ? 16 : 8;
+                if (y < sprite_y || y >= sprite_y + sprite_height) {
+                    continue; // not on this scanline
+                }
+                
+                // check if this pixel is within the sprite's x range
+                if (x < sprite_x || x >= sprite_x + 8) {
+                    continue; // not in this sprite's column
+                }
+                
+                // figure out which row of the sprite we're on
+                int row = y - sprite_y;
+                
+                // vertical flip
+                if (sprite_attr & 0x80) {
+                    row = (sprite_height - 1) - row;
+                }
+                
+                // get pattern data
+                bool spr_table = (ppu->ctrl & PPUCTRL_SPRITE_TABLE) != 0;
+                u8 spr_low, spr_high;
+                
+                if (sprite_height == 16) {
+                    // 8x16 sprites use a different tile addressing scheme
+                    // bit 0 of tile number selects pattern table
+                    // actual tile = tile_number & 0xFE
+                    spr_table = (sprite_tile & 0x01) != 0;
+                    sprite_tile &= 0xFE;
+                    if (row >= 8) {
+                        sprite_tile++;
+                        row -= 8;
+                    }
+                }
+                
+                ppu_get_pattern_row(ppu, sprite_tile, row, spr_table, &spr_low, &spr_high);
+                
+                // figure out which column of the sprite
+                int col = x - sprite_x;
+                
+                // horizontal flip
+                if (sprite_attr & 0x40) {
+                    col = 7 - col;
+                }
+                
+                u8 spr_pixel = ppu_get_pixel_from_pattern(spr_low, spr_high, col);
+                
+                if (spr_pixel == 0) {
+                    continue; // transparent pixel
+                }
+                
+                // sprite zero hit detection
+                if (i == 0 && bg_pixel != 0 && x != 255) {
+                    ppu->status |= PPUSTATUS_SPRITE_ZERO;
+                    sprite_hit = true;
+                }
+                
+                // check priority bit
+                // bit 5: 0 = in front of background, 1 = behind background
+                bool behind_bg = (sprite_attr & 0x20) != 0;
+                
+                if (behind_bg && bg_pixel != 0) {
+                    continue; // bg has priority and bg pixel is opaque
+                }
+                
+                // draw the sprite pixel
+                u8 spr_palette = (sprite_attr & 0x03) + 4; // sprite palettes are 4-7
+                u8 palette_index = ppu->palette[spr_palette * 4 + spr_pixel];
                 color = nes_palette[palette_index & 0x3F];
             }
         }
