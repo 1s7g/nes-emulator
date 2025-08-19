@@ -249,7 +249,8 @@ void ppu_write_register(PPU *ppu, u16 addr, u8 val) {
 }
 
 
-// fetch a tile from pattern table
+// tiles are 16 bytes, first 8 = low bits, next 8 = high bits
+// took me way too long to figure this out
 void ppu_get_pattern_row(PPU *ppu, u8 tile_id, int row, bool table, u8 *low, u8 *high) {
     // each tile is 16 bytes (8 rows x 2 planes)
     // table 0 = $0000, table 1 = $1000
@@ -260,7 +261,7 @@ void ppu_get_pattern_row(PPU *ppu, u8 tile_id, int row, bool table, u8 *low, u8 
     *high = ppu_read_vram(ppu, addr + 8);
 }
 
-// get pixel color (0-3) from pattern data
+// bit 7 is LEFT side, not right. kept getting this backwards
 u8 ppu_get_pixel_from_pattern(u8 low, u8 high, int x) {
     // x is 0-7, leftmost pixel is bit 7
     int shift = 7 - x;
@@ -316,6 +317,9 @@ void ppu_step(PPU *ppu) {
             u16 attr_addr = 0x23C0 + attr_y * 8 + attr_x;
             u8 attr_byte = ppu_read_vram(ppu, attr_addr);
             
+            // this shift calculation... i dont fully understand it but it works
+            // something about 2x2 tile groups within 4x4 areas
+            // copied from nesdev wiki honestly
             int shift = ((tile_y % 4) / 2) * 4 + ((tile_x % 4) / 2) * 2;
             u8 palette_id = (attr_byte >> shift) & 0x03;
             
@@ -331,7 +335,9 @@ void ppu_step(PPU *ppu) {
             }
         }
         
-        // === SPRITES ===
+        // TODO: sprite evaluation is probably wrong
+        // only checking 8 sprites per scanline but not really enforcing it??
+        // games seem to work so whatever for now
         if (ppu->mask & PPUMASK_SHOW_SPR) {
             // go through OAM in reverse so sprite 0 has highest priority
             // (last one drawn wins, and we want sprite 0 on top)
@@ -398,7 +404,8 @@ void ppu_step(PPU *ppu) {
                     continue; // transparent pixel
                 }
                 
-                // sprite zero hit detection
+                // sprite zero hit - took FOREVER to get this right
+                // x != 255 is some edge case i found on forums
                 if (i == 0 && bg_pixel != 0 && x != 255) {
                     ppu->status |= PPUSTATUS_SPRITE_ZERO;
                     sprite_hit = true;

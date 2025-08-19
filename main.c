@@ -73,11 +73,6 @@ int main(int argc, char *argv[]) {
         
         // update controller BEFORE the frame too
         const u8 *keys = SDL_GetKeyboardState(NULL);
-
-         // debug: check right arrow specifically
-        if (keys[SDL_SCANCODE_RIGHT]) {
-            printf("[INPUT] RIGHT ARROW PRESSED (scancode works)\n");
-        }
         u8 buttons = 0;
         if (keys[SDL_SCANCODE_Z])      buttons |= BTN_A;
         if (keys[SDL_SCANCODE_X])      buttons |= BTN_B;
@@ -88,9 +83,6 @@ int main(int argc, char *argv[]) {
         if (keys[SDL_SCANCODE_DOWN]  || keys[SDL_SCANCODE_S]) buttons |= BTN_DOWN;
         if (keys[SDL_SCANCODE_LEFT]  || keys[SDL_SCANCODE_A]) buttons |= BTN_LEFT;
         if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) buttons |= BTN_RIGHT;
-        if (buttons != 0) {
-            printf("[INPUT] buttons: %02X\n", buttons);
-        }
         controller_set_buttons(&bus.controller1, buttons);
         
         // run one frame
