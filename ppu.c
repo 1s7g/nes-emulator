@@ -280,7 +280,8 @@ void ppu_step(PPU *ppu) {
     // vblank: 241-260
     // pre-render: 261
     
-    bool rendering_enabled = (ppu->mask & (PPUMASK_SHOW_BG | PPUMASK_SHOW_SPR)) != 0;
+    // bool rendering_enabled = (ppu->mask & (PPUMASK_SHOW_BG | PPUMASK_SHOW_SPR)) != 0;
+    // not using this yet but might need it later
     bool visible_scanline = ppu->scanline < 240;
     bool visible_cycle = ppu->cycle >= 1 && ppu->cycle <= 256;
     
@@ -344,8 +345,6 @@ void ppu_step(PPU *ppu) {
         if (ppu->mask & PPUMASK_SHOW_SPR) {
             // go through OAM in reverse so sprite 0 has highest priority
             // (last one drawn wins, and we want sprite 0 on top)
-            
-            bool sprite_hit = false; // for sprite zero hit detection
             
             for (int i = 63; i >= 0; i--) {
                 u8 sprite_y    = ppu->oam[i * 4 + 0];
@@ -411,7 +410,6 @@ void ppu_step(PPU *ppu) {
                 // x != 255 is some edge case i found on forums
                 if (i == 0 && bg_pixel != 0 && x != 255) {
                     ppu->status |= PPUSTATUS_SPRITE_ZERO;
-                    sprite_hit = true;
                 }
                 
                 // check priority bit

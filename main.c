@@ -56,6 +56,12 @@ int main(int argc, char *argv[]) {
     printf("Shift = Select\n");
     printf("Escape = Quit\n");
     printf("----------------\n\n");
+
+    // fps counter stuff
+    // stolen from stackoverflow lol
+    u32 fps_timer = SDL_GetTicks();
+    int fps_frames = 0;
+    int fps_current = 0;
     
     bool running = true;
     SDL_Event event;
@@ -104,6 +110,20 @@ int main(int argc, char *argv[]) {
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
+        
+        // fps counter, update title every second
+        fps_frames++;
+        u32 now = SDL_GetTicks();
+        if (now - fps_timer >= 1000) {
+            fps_current = fps_frames;
+            fps_frames = 0;
+            fps_timer = now;
+            
+            char title[64];
+            // should be 60fps ideally
+            sprintf(title, "NES Emulator - %d fps", fps_current);
+            SDL_SetWindowTitle(window, title);
+        }
     }
     
     // cleanup
