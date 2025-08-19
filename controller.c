@@ -8,11 +8,17 @@ void controller_init(Controller *ctrl) {
 
 void controller_write(Controller *ctrl, u8 val) {
     bool new_strobe = (val & 0x01) != 0;
+    
+    // strobe falling edge = latch the buttons into shift register
+    // i had this wrong before, both branches did the same thing lol
+    if (ctrl->strobe && !new_strobe) {
+        ctrl->shift_reg = ctrl->buttons;
+    }
+    
     ctrl->strobe = new_strobe;
     
+    // while strobe is high, always reload
     if (ctrl->strobe) {
-        ctrl->shift_reg = ctrl->buttons;
-    } else {
         ctrl->shift_reg = ctrl->buttons;
     }
 }
