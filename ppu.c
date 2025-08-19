@@ -58,30 +58,33 @@ void ppu_reset(PPU *ppu) {
 
 // helper: get the actual vram address considering mirroring
 u16 ppu_mirror_vram(PPU *ppu, u16 addr) {
-    addr &= 0x2FFF;  // wrap to $2000-$2FFF range
-    addr -= 0x2000;  // make it 0-based
+    addr &= 0x2FFF;
+    addr -= 0x2000;
     
-    // NES has 2KB of VRAM but 4 nametables (4KB addressable)
-    // mirroring determines how the 2KB maps to the 4 nametable slots
-    // horizontal mirroring: $2000=$2400, $2800=$2C00
-    // vertical mirroring: $2000=$2800, $2400=$2C00
+    // NES has 2KB vram mapped across 4 nametables
+    // horizontal: A=B (top/bottom share), C=D
+    // vertical: A=C (left/right share), B=D
+    // i had this completely wrong before, was collapsing everything to 1KB
     
     if (ppu->mirroring == 0) {
-        // horizontal
-        if (addr >= 0x800) {
-            addr -= 0x800;
-        }
-        if (addr >= 0x400 && addr < 0x800) {
-            addr -= 0x400;
-        }
+        // horizontal mirroring
+        // nametable 0 ($2000) and 1 ($2400) are the same
+        // nametable 2 ($2800) and 3 ($2C00) are the same
+        if (addr >= 0x000 && addr < 0x400) return addr;           // NT0
+        if (addr >= 0x400 && addr < 0x800) return addr - 0x400;   // NT1 = NT0
+        if (addr >= 0x800 && addr < 0xC00) return addr - 0x400;   // NT2
+        if (addr >= 0xC00 && addr < 0x1000) return addr - 0x800;  // NT3 = NT2
     } else {
-        // vertical
-        if (addr >= 0x800) {
-            addr -= 0x800;
-        }
+        // vertical mirroring
+        // nametable 0 ($2000) and 2 ($2800) are the same
+        // nametable 1 ($2400) and 3 ($2C00) are the same
+        if (addr >= 0x000 && addr < 0x400) return addr;           // NT0
+        if (addr >= 0x400 && addr < 0x800) return addr;           // NT1
+        if (addr >= 0x800 && addr < 0xC00) return addr - 0x800;   // NT2 = NT0
+        if (addr >= 0xC00 && addr < 0x1000) return addr - 0x800;  // NT3 = NT1
     }
     
-    return addr & 0x7FF;  // clamp to 2KB
+    return addr & 0x7FF; // fallback, shouldnt hit this
 }
 
 
