@@ -4,39 +4,42 @@
 #include "types.h"
 
 // PPU registers (memory mapped at $2000-$2007)
-// $2000 - PPUCTRL
-// $2001 - PPUMASK  
-// $2002 - PPUSTATUS
+// $2000 - PPUCTRL - control
+// $2001 - PPUMASK - rendering flags
+// $2002 - PPUSTATUS - read only
 // $2003 - OAMADDR
 // $2004 - OAMDATA
-// $2005 - PPUSCROLL
-// $2006 - PPUADDR
+// $2005 - PPUSCROLL - write twice
+// $2006 - PPUADDR - write twice (annoying)
 // $2007 - PPUDATA
 
-// PPUCTRL bits
-#define PPUCTRL_NAMETABLE_X     0x01
-#define PPUCTRL_NAMETABLE_Y     0x02
-#define PPUCTRL_INCREMENT       0x04  // 0=add 1, 1=add 32
-#define PPUCTRL_SPRITE_TABLE    0x08
-#define PPUCTRL_BG_TABLE        0x10
-#define PPUCTRL_SPRITE_SIZE     0x20  // 0=8x8, 1=8x16
-#define PPUCTRL_MASTER_SLAVE    0x40  // unused on NES
-#define PPUCTRL_NMI_ENABLE      0x80
+// PPUCTRL bits ($2000)
+// i keep forgetting which bit does what so im writing it all out
+#define PPUCTRL_NAMETABLE_X     0x01  // nametable x select
+#define PPUCTRL_NAMETABLE_Y     0x02  // nametable y select
+#define PPUCTRL_INCREMENT       0x04  // 0=go across (+1), 1=go down (+32)
+#define PPUCTRL_SPRITE_TABLE    0x08  // which pattern table for sprites
+#define PPUCTRL_BG_TABLE        0x10  // which pattern table for background
+#define PPUCTRL_SPRITE_SIZE     0x20  // 0=8x8, 1=8x16 (tall sprites)
+#define PPUCTRL_MASTER_SLAVE    0x40  // doesnt matter on NES, ignore
+#define PPUCTRL_NMI_ENABLE      0x80  // trigger NMI on vblank, games need this
 
-// PPUMASK bits
-#define PPUMASK_GREYSCALE       0x01
-#define PPUMASK_SHOW_BG_LEFT    0x02
-#define PPUMASK_SHOW_SPR_LEFT   0x04
-#define PPUMASK_SHOW_BG         0x08
-#define PPUMASK_SHOW_SPR        0x10
+// PPUMASK bits ($2001)
+#define PPUMASK_GREYSCALE       0x01  // greyscale mode, cool but useless for now
+#define PPUMASK_SHOW_BG_LEFT    0x02  // show bg in leftmost 8 pixels
+#define PPUMASK_SHOW_SPR_LEFT   0x04  // show sprites in leftmost 8 pixels
+#define PPUMASK_SHOW_BG         0x08  // enable background rendering
+#define PPUMASK_SHOW_SPR        0x10  // enable sprite rendering
+// these three are color emphasis bits, not implementing rn
 #define PPUMASK_EMPHASIZE_R     0x20
 #define PPUMASK_EMPHASIZE_G     0x40
 #define PPUMASK_EMPHASIZE_B     0x80
 
-// PPUSTATUS bits
-#define PPUSTATUS_OVERFLOW      0x20
-#define PPUSTATUS_SPRITE_ZERO   0x40
-#define PPUSTATUS_VBLANK        0x80
+// PPUSTATUS bits ($2002)
+// only top 3 bits actually mean something
+#define PPUSTATUS_OVERFLOW      0x20  // sprite overflow (buggy on real hardware lol)
+#define PPUSTATUS_SPRITE_ZERO   0x40  // sprite zero hit
+#define PPUSTATUS_VBLANK        0x80  // vblank started
 
 typedef struct {
     // registers

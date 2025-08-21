@@ -4,48 +4,45 @@
 #include "types.h"
 
 // 6502 CPU Status flags
-// these are bits in the status register (P)
-// the layout is: NV-BDIZC
-// bit 5 is unused (always 1) which is kinda annoying but whatever
-#define FLAG_C 0x01  // carry
-#define FLAG_Z 0x02  // zero
-#define FLAG_I 0x04  // interrupt disable
-#define FLAG_D 0x08  // decimal mode (NES doesnt use this but the flag exists)
-#define FLAG_B 0x10  // break
-#define FLAG_U 0x20  // unused, always 1
-#define FLAG_V 0x40  // overflow
-#define FLAG_N 0x80  // negative
+// layout is: NV-BDIZC
+// N = negative, V = overflow, - = unused (always 1??), B = break
+// D = decimal (NES doesnt use this but the flag exists for some reason)
+// I = interrupt disable, Z = zero, C = carry
+// i had to look this up like 5 times before i remembered it
+#define FLAG_C 0x01  // carry - set when addition overflows or subtraction underflows
+#define FLAG_Z 0x02  // zero - set when result is 0
+#define FLAG_I 0x04  // interrupt disable - when set, ignores IRQ
+#define FLAG_D 0x08  // decimal - unused on NES, whatever
+#define FLAG_B 0x10  // break - set when BRK instruction fires
+#define FLAG_U 0x20  // unused, always 1, annoying to deal with
+#define FLAG_V 0x40  // overflow - signed overflow, harder to understand than carry
+#define FLAG_N 0x80  // negative - copy of bit 7 of result
 
 typedef struct {
     // registers
     u8 a;      // accumulator
-    u8 x;      // index register x
-    u8 y;      // index register y
-    u8 sp;     // stack pointer
+    u8 x;      // X
+    u8 y;      // Y
+    u8 sp;     // stack pointer (starts at 0xFD on reset)
     u16 pc;    // program counter
-    u8 status; // status register (the flags)
+    u8 status; // NV-BDIZC flags
 
-    // not really "registers" but we need to track these
-    u64 cycles; // total cycles executed... might be useful later?? idk
-    // TODO: do i need anything else here
+    u64 cycles; // total cycles, using this for timing stuff
+    // might need to track per-instruction cycles separately later?
+    // some ppl on nesdev forums say you need cycle-accurate timing
+    // but it works fine without it so far
 } CPU;
 
 // functions
 void cpu_init(CPU *cpu);
 void cpu_reset(CPU *cpu);
-void cpu_step(CPU *cpu); // execute one instruction
-void cpu_print_state(CPU *cpu); // for debugging, gonna need this A LOT
+void cpu_step(CPU *cpu);
+void cpu_print_state(CPU *cpu);
 void cpu_set_bus(void *bus);
 void cpu_nmi(CPU *cpu);
 
-// helper stuff for flags
 void cpu_set_flag(CPU *cpu, u8 flag, bool value);
 bool cpu_get_flag(CPU *cpu, u8 flag);
-
-// these two flags get set so often im making helpers
 void cpu_update_zero_and_negative(CPU *cpu, u8 value);
-
-// load raw bytes into memory (temporary until proper rom loading)
-void cpu_load_program(CPU *cpu, u8 *program, u16 size, u16 offset);
 
 #endif

@@ -27,19 +27,26 @@ bool cartridge_load(Cartridge *cart, const char *filename) {
         return false;
     }
     
-    // parse header
-    u8 prg_banks = header[4];
-    u8 chr_banks = header[5];
+    // pull out the important stuff from the header
+    // bytes 4 and 5 are rom sizes
+    u8 prg_banks = header[4];  // number of 16KB prg banks
+    u8 chr_banks = header[5];  // number of 8KB chr banks (0 means chr ram)
     u8 flags6 = header[6];
     u8 flags7 = header[7];
+    // bytes 8-15 are usually zero, ignoring them
+    // NES 2.0 format uses them but whatever, not dealing with that now
     
-    cart->prg_size = prg_banks * 16384;  // 16KB per bank
-    cart->chr_size = chr_banks * 8192;   // 8KB per bank
+    cart->prg_size = prg_banks * 16384;
+    cart->chr_size = chr_banks * 8192;
     
+    // mapper number is split across high nibble of flags6 and flags7
+    // why they did it this way i have no idea
     cart->mapper = (flags7 & 0xF0) | (flags6 >> 4);
-    cart->mirroring = flags6 & 0x01;
-    cart->has_battery = (flags6 & 0x02) != 0;
+    cart->mirroring = flags6 & 0x01;  // bit 0: 0=horizontal 1=vertical
+    cart->has_battery = (flags6 & 0x02) != 0;  // bit 1: battery backed ram
     
+    // bit 2 of flags6 = trainer present (512 bytes before prg rom)
+    // almost no games use this
     bool has_trainer = (flags6 & 0x04) != 0;
     
     // skip trainer if present (512 bytes, rarely used)
