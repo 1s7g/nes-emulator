@@ -113,6 +113,17 @@ u16 cpu_pop16(CPU *cpu) {
     return (hi << 8) | lo;
 }
 
+// i used this to dump memory when debugging the stack
+// dont need it anymore but keeping it just in case
+/*
+void cpu_dump_stack(CPU *cpu) {
+    printf("--- stack dump ---\n");
+    for (int i = 0xFF; i >= cpu->sp; i--) {
+        printf("  $01%02X: %02X\n", i, cpu_read(cpu, 0x0100 + i));
+    }
+    printf("--- end stack ---\n");
+}
+*/
 
 void cpu_print_state(CPU *cpu) {
     printf("A:%02X X:%02X Y:%02X SP:%02X PC:%04X ", 
@@ -998,7 +1009,7 @@ void cpu_step(CPU *cpu) {
             u16 addr = addr_absolute_y(cpu);
             cpu->x = cpu_read(cpu, addr);
             cpu_update_zero_and_negative(cpu, cpu->x);
-            cpu->cycles += 4;
+            cpu->cycles += 4; // TODO: +1 if page boundary crossed
             break;
         }
 
@@ -1017,6 +1028,9 @@ void cpu_step(CPU *cpu) {
             cpu->cycles += 4;
             break;
         }
+        
+        // TODO: theres more LDY addressing modes i think?
+        // havent needed them yet so skipping for now
 
         // ===== More STA addressing modes =====
         case 0x81: { // STA (indirect,X)
