@@ -1,6 +1,5 @@
 TODO
 ====
-- scrolling (SMB needs this bad)
 - sound/APU (no idea where to start)
 - mapper 1 (MMC1) for zelda etc
 - save states maybe?
@@ -13,10 +12,10 @@ DONE
 - sprite rendering + sprite zero
 - controller input (the strobe thing was confusing)
 - nametable mirroring fix
+- scrolling!! SMB actually scrolls now
 
 BUGS I KNOW ABOUT
 ==================
-- scrolling doesnt work, screen is static
 - some sprites look glitchy
 - no sprite overflow limit (8 per scanline)
 - DMA timing is wrong but doesnt seem to matter??
