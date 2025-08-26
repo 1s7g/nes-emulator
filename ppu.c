@@ -275,13 +275,18 @@ u8 ppu_get_pixel_from_pattern(u8 low, u8 high, int x) {
 
 // one ppu cycle
 void ppu_step(PPU *ppu) {
+    // OLD WAY - i tried rendering the whole frame at once during vblank
+    // but that doesnt work for sprite zero hit detection because
+    // games check it mid-frame. had to switch to per-pixel rendering
+    // which is slower but actually correct
+    // RIP my afternoon
+    
     // visible scanlines: 0-239
     // post-render: 240
     // vblank: 241-260
     // pre-render: 261
     
-    // bool rendering_enabled = (ppu->mask & (PPUMASK_SHOW_BG | PPUMASK_SHOW_SPR)) != 0;
-    // not using this yet but might need it later
+    bool rendering_enabled = (ppu->mask & (PPUMASK_SHOW_BG | PPUMASK_SHOW_SPR)) != 0;
     bool visible_scanline = ppu->scanline < 240;
     bool visible_cycle = ppu->cycle >= 1 && ppu->cycle <= 256;
     
@@ -304,21 +309,56 @@ void ppu_step(PPU *ppu) {
         int x = ppu->cycle - 1;
         int y = ppu->scanline;
         u32 color = nes_palette[ppu->palette[0] & 0x3F];
-        u8 bg_pixel = 0; // track if bg pixel is transparent
+        u8 bg_pixel = 0;
         
         // === BACKGROUND ===
         if (ppu->mask & PPUMASK_SHOW_BG) {
-            int tile_x = x / 8;
-            int tile_y = y / 8;
-            int fine_x = x % 8;
-            int fine_y = y % 8;
+            // ok so scrolling... the ppu has this whole internal address
+            // register system (vram_addr / temp_addr / fine_x) that controls
+            // what part of the nametable we're looking at
+            // 
+            // i spent like 3 hours reading loopy's scroll doc trying to
+            // understand this. the vram_addr bits encode the scroll position:
+            //   yyy NN YYYYY XXXXX
+            //   |   |  |     |
+            //   |   |  |     +-- coarse X scroll (which tile column)
+            //   |   |  +-------- coarse Y scroll (which tile row)
+            //   |   +----------- nametable select (2 bits)
+            //   +---------------- fine Y scroll (which row WITHIN the tile)
+            //
+            // fine X is stored separately because of course it is
             
-            u16 nt_addr = 0x2000 + tile_y * 32 + tile_x;
+            // get scroll position from vram address
+            int scroll_x = (ppu->vram_addr & 0x001F);         // coarse X
+            int scroll_y = (ppu->vram_addr >> 5) & 0x1F;      // coarse Y  
+            int fine_y_scroll = (ppu->vram_addr >> 12) & 0x07; // fine Y
+            int nametable = (ppu->vram_addr >> 10) & 0x03;     // which nametable
+            
+            // actual pixel position considering scroll
+            int actual_x = x + ppu->fine_x;
+            int tile_x = scroll_x + (actual_x / 8);
+            int fine_x_pixel = actual_x % 8;
+            int tile_y = scroll_y;
+            int fine_y = fine_y_scroll;
+            
+            // figure out which nametable we're in
+            // if tile_x >= 32 we've scrolled into the next nametable horizontally
+            u16 nt_base = 0x2000;
+            int nt_select = nametable;
+            if (tile_x >= 32) {
+                tile_x -= 32;
+                nt_select ^= 1; // flip horizontal nametable
+            }
+            nt_base = 0x2000 + (nt_select * 0x400);
+            
+            u16 nt_addr = nt_base + tile_y * 32 + tile_x;
             u8 tile_id = ppu_read_vram(ppu, nt_addr);
             
+            // attribute table - this is relative to the nametable we're in
             int attr_x = tile_x / 4;
             int attr_y = tile_y / 4;
-            u16 attr_addr = 0x23C0 + attr_y * 8 + attr_x;
+            u16 attr_base = nt_base + 0x03C0;
+            u16 attr_addr = attr_base + attr_y * 8 + attr_x;
             u8 attr_byte = ppu_read_vram(ppu, attr_addr);
             
             // this shift calculation... i dont fully understand it but it works
@@ -331,7 +371,7 @@ void ppu_step(PPU *ppu) {
             u8 pattern_low, pattern_high;
             ppu_get_pattern_row(ppu, tile_id, fine_y, bg_table, &pattern_low, &pattern_high);
             
-            bg_pixel = ppu_get_pixel_from_pattern(pattern_low, pattern_high, fine_x);
+            bg_pixel = ppu_get_pixel_from_pattern(pattern_low, pattern_high, fine_x_pixel);
             
             if (bg_pixel != 0) {
                 u8 palette_index = ppu->palette[palette_id * 4 + bg_pixel];
@@ -352,36 +392,27 @@ void ppu_step(PPU *ppu) {
                 u8 sprite_attr = ppu->oam[i * 4 + 2];
                 u8 sprite_x    = ppu->oam[i * 4 + 3];
                 
-                // sprite Y is actually Y-1 (sprites are delayed by 1 scanline)
                 sprite_y += 1;
                 
-                // check if this sprite is on the current scanline
                 int sprite_height = (ppu->ctrl & PPUCTRL_SPRITE_SIZE) ? 16 : 8;
                 if (y < sprite_y || y >= sprite_y + sprite_height) {
-                    continue; // not on this scanline
+                    continue;
                 }
                 
-                // check if this pixel is within the sprite's x range
                 if (x < sprite_x || x >= sprite_x + 8) {
-                    continue; // not in this sprite's column
+                    continue;
                 }
                 
-                // figure out which row of the sprite we're on
                 int row = y - sprite_y;
                 
-                // vertical flip
                 if (sprite_attr & 0x80) {
                     row = (sprite_height - 1) - row;
                 }
                 
-                // get pattern data
                 bool spr_table = (ppu->ctrl & PPUCTRL_SPRITE_TABLE) != 0;
                 u8 spr_low, spr_high;
                 
                 if (sprite_height == 16) {
-                    // 8x16 sprites use a different tile addressing scheme
-                    // bit 0 of tile number selects pattern table
-                    // actual tile = tile_number & 0xFE
                     spr_table = (sprite_tile & 0x01) != 0;
                     sprite_tile &= 0xFE;
                     if (row >= 8) {
@@ -392,10 +423,8 @@ void ppu_step(PPU *ppu) {
                 
                 ppu_get_pattern_row(ppu, sprite_tile, row, spr_table, &spr_low, &spr_high);
                 
-                // figure out which column of the sprite
                 int col = x - sprite_x;
                 
-                // horizontal flip
                 if (sprite_attr & 0x40) {
                     col = 7 - col;
                 }
@@ -403,7 +432,7 @@ void ppu_step(PPU *ppu) {
                 u8 spr_pixel = ppu_get_pixel_from_pattern(spr_low, spr_high, col);
                 
                 if (spr_pixel == 0) {
-                    continue; // transparent pixel
+                    continue;
                 }
                 
                 // sprite zero hit - took FOREVER to get this right
@@ -412,22 +441,55 @@ void ppu_step(PPU *ppu) {
                     ppu->status |= PPUSTATUS_SPRITE_ZERO;
                 }
                 
-                // check priority bit
-                // bit 5: 0 = in front of background, 1 = behind background
                 bool behind_bg = (sprite_attr & 0x20) != 0;
                 
                 if (behind_bg && bg_pixel != 0) {
-                    continue; // bg has priority and bg pixel is opaque
+                    continue;
                 }
                 
-                // draw the sprite pixel
-                u8 spr_palette = (sprite_attr & 0x03) + 4; // sprite palettes are 4-7
+                u8 spr_palette = (sprite_attr & 0x03) + 4;
                 u8 palette_index = ppu->palette[spr_palette * 4 + spr_pixel];
                 color = nes_palette[palette_index & 0x3F];
             }
         }
         
         ppu->framebuffer[y * 256 + x] = color;
+    }
+    
+    // scroll updates during rendering
+    // the ppu increments parts of vram_addr as it renders
+    // this is the part that took me forever to get right
+    if (rendering_enabled) {
+        // at cycle 256, increment Y scroll
+        if (visible_scanline && ppu->cycle == 256) {
+            // increment fine Y
+            if ((ppu->vram_addr & 0x7000) != 0x7000) {
+                ppu->vram_addr += 0x1000;
+            } else {
+                ppu->vram_addr &= ~0x7000; // reset fine Y
+                int coarse_y = (ppu->vram_addr & 0x03E0) >> 5;
+                if (coarse_y == 29) {
+                    coarse_y = 0;
+                    ppu->vram_addr ^= 0x0800; // flip vertical nametable
+                } else if (coarse_y == 31) {
+                    coarse_y = 0;
+                    // dont flip nametable, weird edge case
+                } else {
+                    coarse_y++;
+                }
+                ppu->vram_addr = (ppu->vram_addr & ~0x03E0) | (coarse_y << 5);
+            }
+        }
+        
+        // at cycle 257, copy horizontal bits from temp to vram addr
+        if (visible_scanline && ppu->cycle == 257) {
+            ppu->vram_addr = (ppu->vram_addr & ~0x041F) | (ppu->temp_addr & 0x041F);
+        }
+        
+        // during pre-render scanline (261), copy vertical bits
+        if (ppu->scanline == 261 && ppu->cycle >= 280 && ppu->cycle <= 304) {
+            ppu->vram_addr = (ppu->vram_addr & ~0x7BE0) | (ppu->temp_addr & 0x7BE0);
+        }
     }
     
     // advance
