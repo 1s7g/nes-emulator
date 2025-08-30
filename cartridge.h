@@ -21,7 +21,17 @@ typedef struct {
     u8 mirroring;     // 0 = horizontal, 1 = vertical
     bool has_battery; // has battery-backed save ram
     
-    // might need more stuff later idk
+    // mapper 1 (MMC1) state
+    // just shoving this here for now, should probably make a proper
+    // mapper system but zelda uses MMC1 and i want to play zelda
+    // so here we are
+    u8 shift_reg;       // 5-bit shift register (serial port thing)
+    u8 shift_count;     // how many bits written so far
+    u8 mmc1_ctrl;       // control register - mirroring, prg/chr modes
+    u8 mmc1_chr0;       // chr bank 0
+    u8 mmc1_chr1;       // chr bank 1  
+    u8 mmc1_prg;        // prg bank select
+    u8 prg_ram[8192];   // 8KB PRG RAM at $6000-$7FFF, zelda saves here
 } Cartridge;
 
 // functions

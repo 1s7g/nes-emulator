@@ -76,6 +76,11 @@ typedef struct {
     u32 chr_size;
     u8 mirroring;  // 0=horizontal, 1=vertical
     
+    // chr banking - mapper updates these
+    // i didnt need this for mapper 0 but MMC1 switches chr banks
+    u32 chr_bank_0;  // offset for pattern table $0000-$0FFF
+    u32 chr_bank_1;  // offset for pattern table $1000-$1FFF
+    
 } PPU;
 
 void ppu_init(PPU *ppu);

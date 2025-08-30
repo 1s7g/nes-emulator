@@ -93,8 +93,15 @@ u8 ppu_read_vram(PPU *ppu, u16 addr) {
     
     if (addr < 0x2000) {
         // chr rom/ram (pattern tables)
-        if (ppu->chr_rom && addr < ppu->chr_size) {
-            return ppu->chr_rom[addr];
+        // now with bank switching support for MMC1 etc
+        if (ppu->chr_rom) {
+            if (addr < 0x1000) {
+                u32 mapped = ppu->chr_bank_0 + addr;
+                return ppu->chr_rom[mapped % ppu->chr_size];
+            } else {
+                u32 mapped = ppu->chr_bank_1 + (addr - 0x1000);
+                return ppu->chr_rom[mapped % ppu->chr_size];
+            }
         }
         return 0;
     } 
@@ -118,9 +125,15 @@ void ppu_write_vram(PPU *ppu, u16 addr, u8 val) {
     addr &= 0x3FFF;
     
     if (addr < 0x2000) {
-        // chr rom - usually not writable but some carts have chr ram
-        if (ppu->chr_rom && addr < ppu->chr_size) {
-            ppu->chr_rom[addr] = val;  // will only work if its actually ram
+        // chr ram writes (only works if its actually ram)
+        if (ppu->chr_rom) {
+            if (addr < 0x1000) {
+                u32 mapped = ppu->chr_bank_0 + addr;
+                ppu->chr_rom[mapped % ppu->chr_size] = val;
+            } else {
+                u32 mapped = ppu->chr_bank_1 + (addr - 0x1000);
+                ppu->chr_rom[mapped % ppu->chr_size] = val;
+            }
         }
     }
     else if (addr < 0x3F00) {
