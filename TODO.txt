@@ -1,7 +1,7 @@
 TODO
 ====
 - sound/APU (no idea where to start)
-- mapper 1 (MMC1) for zelda etc
+- mapper 4 (MMC3) for SMB3, kirby
 - save states maybe?
 - the ppu timing is probably wrong, some games might break
 
@@ -13,9 +13,11 @@ DONE
 - controller input (the strobe thing was confusing)
 - nametable mirroring fix
 - scrolling!! SMB actually scrolls now
+- mapper 1 (MMC1) - zelda, metroid, mega man 2 all work
 
 BUGS I KNOW ABOUT
 ==================
 - some sprites look glitchy
 - no sprite overflow limit (8 per scanline)
 - DMA timing is wrong but doesnt seem to matter??
+- single-screen mirroring not implemented (mapper uses it sometimes)
