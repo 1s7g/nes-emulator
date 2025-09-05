@@ -4,18 +4,39 @@
 #include "bus.h"
 
 // NES Emulator
-// debugging controller input, this is taking forever lol
+// finally adding sound, this is gonna be fun
+
+// audio callback for SDL
+void audio_callback(void *userdata, u8 *stream, int len) {
+    APU *apu = (APU*)userdata;
+    float *out = (float*)stream;
+    int samples = len / sizeof(float);
+    
+    for (int i = 0; i < samples; i++) {
+        if (apu->sample_index > 0) {
+            // grab from buffer
+            out[i] = apu->sample_buffer[0];
+            // shift buffer down (lazy way, should use ring buffer but whatever)
+            for (int j = 0; j < apu->sample_index - 1; j++) {
+                apu->sample_buffer[j] = apu->sample_buffer[j + 1];
+            }
+            apu->sample_index--;
+        } else {
+            out[i] = 0;
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
     printf("=== NES Emulator ===\n");
-    printf("version 0.4.0 (controller support)\n\n");
+    printf("version 0.5.0 (sound support!)\n\n");
     
     if (argc < 2) {
         printf("Usage: nes <rom.nes>\n");
         return 1;
     }
     
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         printf("SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
@@ -48,21 +69,40 @@ int main(int argc, char *argv[]) {
     
     bus_reset(&bus);
     
+    // setup audio
+    // took me a while to figure out SDL audio, its kinda weird
+    SDL_AudioSpec want, have;
+    SDL_memset(&want, 0, sizeof(want));
+    want.freq = 44100;
+    want.format = AUDIO_F32SYS;
+    want.channels = 1;
+    want.samples = 512;
+    want.callback = audio_callback;
+    want.userdata = &bus.apu;
+    
+    SDL_AudioDeviceID audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    if (audio_dev == 0) {
+        printf("[AUDIO] failed to open audio: %s\n", SDL_GetError());
+        printf("[AUDIO] continuing without sound\n");
+    } else {
+        printf("[AUDIO] opened audio device, freq=%d\n", have.freq);
+        SDL_PauseAudioDevice(audio_dev, 0);  // start playing
+    }
+    
     printf("\n--- controls ---\n");
-    printf("Arrow keys = D-pad\n");
+    printf("Arrow keys / WASD = D-pad\n");
     printf("Z = A button\n");
     printf("X = B button\n");
     printf("Enter = Start\n");
     printf("Shift = Select\n");
     printf("Escape = Quit\n");
     printf("----------------\n\n");
-
+    
     // fps counter stuff
     // stolen from stackoverflow lol
     u32 fps_timer = SDL_GetTicks();
     int fps_frames = 0;
     int fps_current = 0;
-    
     bool running = true;
     SDL_Event event;
     
@@ -77,7 +117,7 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        // update controller BEFORE the frame too
+        // update controller
         const u8 *keys = SDL_GetKeyboardState(NULL);
         u8 buttons = 0;
         if (keys[SDL_SCANCODE_Z])      buttons |= BTN_A;
@@ -100,9 +140,14 @@ int main(int argc, char *argv[]) {
             }
             
             cpu_step(&bus.cpu);
+            
+            // ppu runs 3x faster than cpu
             ppu_step(&bus.ppu);
             ppu_step(&bus.ppu);
             ppu_step(&bus.ppu);
+            
+            // apu runs at cpu speed
+            apu_step(&bus.apu);
         }
         
         // display
@@ -111,7 +156,7 @@ int main(int argc, char *argv[]) {
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
         
-        // fps counter, update title every second
+        // fps counter
         fps_frames++;
         u32 now = SDL_GetTicks();
         if (now - fps_timer >= 1000) {
@@ -120,13 +165,15 @@ int main(int argc, char *argv[]) {
             fps_timer = now;
             
             char title[64];
-            // should be 60fps ideally
             sprintf(title, "NES Emulator - %d fps", fps_current);
             SDL_SetWindowTitle(window, title);
         }
     }
     
     // cleanup
+    if (audio_dev != 0) {
+        SDL_CloseAudioDevice(audio_dev);
+    }
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
