@@ -9,6 +9,8 @@ a nes emulator i wrote to learn how the nes works. its not perfect but it plays 
 ![smb title screen](screenshots/smb_title.png)
 ![smb gameplay](screenshots/smb_gameplay.png)
 
+**Legend of Zelda**
+
 ![Legend of Zelda](screenshots/zelda.png)
 
 ## what works
