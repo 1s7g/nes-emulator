@@ -12,11 +12,12 @@ void audio_callback(void *userdata, u8 *stream, int len) {
     float *out = (float*)stream;
     int samples = len / sizeof(float);
     
+    // this is probably not the best way to do this
+    // should use a proper ring buffer but this works for now
     for (int i = 0; i < samples; i++) {
         if (apu->sample_index > 0) {
-            // grab from buffer
             out[i] = apu->sample_buffer[0];
-            // shift buffer down (lazy way, should use ring buffer but whatever)
+            // shift everything down, yeah its slow but whatever
             for (int j = 0; j < apu->sample_index - 1; j++) {
                 apu->sample_buffer[j] = apu->sample_buffer[j + 1];
             }

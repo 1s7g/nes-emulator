@@ -121,9 +121,9 @@ void cartridge_print_info(Cartridge *cart) {
     printf("Battery: %s\n", cart->has_battery ? "Yes" : "No");
     
     // warn about unsupported mappers
-    if (cart->mapper != 0) {
-        printf("WARNING: mapper %d might not be supported yet!!\n", cart->mapper);
-        printf("only mapper 0 (NROM) works for now\n");
+    if (cart->mapper != 0 && cart->mapper != 1) {
+        printf("WARNING: mapper %d not supported!!\n", cart->mapper);
+        printf("only mappers 0 (NROM) and 1 (MMC1) work right now\n");
     }
     printf("======================\n");
 }

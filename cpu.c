@@ -594,8 +594,8 @@ void cpu_step(CPU *cpu) {
         }
 
         // ===== SBC - Subtract with Carry =====
-        // its like ADC but you invert the value. seriously thats it
-        // ...i think
+        // honestly just copied the ADC logic and inverted the value
+        // apparently thats how the 6502 actually does it internally?
         case 0xE9: { // SBC immediate
             u16 addr = addr_immediate(cpu);
             u8 val = cpu_read(cpu, addr);
